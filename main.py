@@ -18,10 +18,12 @@ import models.dcgan as dcgan
 import models.mlp as mlp
 
 
+isDebug  = False
 USE_CUDA = torch.cuda.is_available()
 
 #default Hyper-parameter values
-NUM_EPOCHS = 25
+DATASET = 'cifar10'
+NUM_EPOCHS = 2 if isDebug else 25
 LR_D = 0.00005
 LR_G = 0.00005
 
@@ -66,6 +68,14 @@ def main(opt):
                                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                                ])
         )
+    elif opt.dataset == 'mnist':
+        dataset = dset.MNIST(root=opt.dataroot, download=True, transform=transforms.Compose([
+                                   transforms.Scale(opt.imageSize),
+                                   transforms.ToTensor(),
+                                   transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                               ]))
+        # Update opt params for mnist
+        opt.nc = 1
 
     assert dataset
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=opt.batchSize,
@@ -199,22 +209,24 @@ def main(opt):
             print('[%d/%d][%d/%d][%d] Loss_D: %f Loss_G: %f Loss_D_real: %f Loss_D_fake %f'
                 % (epoch, opt.niter, i, len(dataloader), gen_iterations,
                 errD.data[0], errG.data[0], errD_real.data[0], errD_fake.data[0]))
-            if gen_iterations % 500 == 0:
+            if gen_iterations % 500 == 0 or ((gen_iterations % 100 == 0) and (opt.dataset == 'mnist')):
                 real_cpu = real_cpu.mul(0.5).add(0.5)
-                vutils.save_image(real_cpu, '{0}/real_samples.png'.format(opt.experiment))
+                vutils.save_image(real_cpu, '{0}/{1}_real_samples.png'.format(opt.experiment, opt.dataset))
                 fake = netG(Variable(fixed_noise, volatile=True))
                 fake.data = fake.data.mul(0.5).add(0.5)
-                vutils.save_image(fake.data, '{0}/fake_samples_{1}.png'.format(opt.experiment, gen_iterations))
+                vutils.save_image(fake.data, '{0}/{1}_fake_samples_{2}.png'.format(opt.experiment, opt.dataset, gen_iterations))
 
         # do checkpointing
-        torch.save(netG.state_dict(), '{0}/netG_epoch_{1}.pth'.format(opt.experiment, epoch))
-        torch.save(netD.state_dict(), '{0}/netD_epoch_{1}.pth'.format(opt.experiment, epoch))
+        torch.save(netG.state_dict(), '{0}/{1}_netG_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
+        torch.save(netD.state_dict(), '{0}/{1}_netD_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', required=True, help='cifar10 | lsun | imagenet | folder | lfw ')
+    # parser.add_argument('--dataset', required=True, help='cifar10 | lsun | imagenet | folder | lfw ')
+    parser.add_argument('--dataset', required=False, type=str, default=DATASET, help='cifar10 | imagenet | folder | lfw ')
     parser.add_argument('--dataroot', required=True, help='path to dataset')
+    parser.add_argument('--debug', default=isDebug, help='True | False')
     parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
     parser.add_argument('--batchSize', type=int, default=64, help='input batch size')
     parser.add_argument('--imageSize', type=int, default=64, help='the height / width of the input image to network')
