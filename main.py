@@ -14,11 +14,13 @@ from torch.autograd import Variable
 import os
 import tqdm
 
+import numpy as np
+
 import models.dcgan as dcgan
 import models.mlp as mlp
 
 
-isDebug  = False
+isDebug  = True
 USE_CUDA = torch.cuda.is_available()
 
 #default Hyper-parameter values
@@ -140,6 +142,7 @@ def main(opt):
         optimizerD = optim.RMSprop(netD.parameters(), lr = opt.lrD)
         optimizerG = optim.RMSprop(netG.parameters(), lr = opt.lrG)
 
+    wasserstein_estimate = []
     gen_iterations = 0
     for epoch in range(opt.niter):
         data_iter = iter(dataloader)
@@ -209,6 +212,9 @@ def main(opt):
             print('[%d/%d][%d/%d][%d] Loss_D: %f Loss_G: %f Loss_D_real: %f Loss_D_fake %f'
                 % (epoch, opt.niter, i, len(dataloader), gen_iterations,
                 errD.data[0], errG.data[0], errD_real.data[0], errD_fake.data[0]))
+
+            wasserstein_estimate.append(errD.data[0])
+
             if gen_iterations % 500 == 0 or ((gen_iterations % 100 == 0) and (opt.dataset == 'mnist')):
                 real_cpu = real_cpu.mul(0.5).add(0.5)
                 vutils.save_image(real_cpu, '{0}/{1}_real_samples.png'.format(opt.experiment, opt.dataset))
@@ -217,8 +223,16 @@ def main(opt):
                 vutils.save_image(fake.data, '{0}/{1}_fake_samples_{2}.png'.format(opt.experiment, opt.dataset, gen_iterations))
 
         # do checkpointing
-        torch.save(netG.state_dict(), '{0}/{1}_netG_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
-        torch.save(netD.state_dict(), '{0}/{1}_netD_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
+        if opt.niter > 25:
+            if epoch % 10 == 0:
+                torch.save(netG.state_dict(), '{0}/{1}_netG_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
+                torch.save(netD.state_dict(), '{0}/{1}_netD_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
+        else:
+            torch.save(netG.state_dict(), '{0}/{1}_netG_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
+            torch.save(netD.state_dict(), '{0}/{1}_netD_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
+
+        # Save Wassestein estimate
+        np.save(f"{opt.experiment}/wasserstein_estimate_{epoch}", np.array(wasserstein_estimate))
 
 if __name__ == "__main__":
 
