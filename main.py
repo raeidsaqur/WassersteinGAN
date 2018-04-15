@@ -11,7 +11,7 @@ import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torchvision.utils as vutils
 from torch.autograd import Variable
-import os
+import os, sys
 import tqdm
 
 import numpy as np
@@ -20,11 +20,22 @@ import models.dcgan as dcgan
 import models.mlp as mlp
 
 
-isDebug  = True
+isDebug  = False
 USE_CUDA = torch.cuda.is_available()
 
 #default Hyper-parameter values
 DATASET = 'cifar10'
+# NETG_CIFAR10 = './samples/cifar10_netG_epoch_240.pth'
+# NETD_CIFAR10 = './samples/cifar10_netD_epoch_240.pth'
+# NETG_MNIST = './samples/mnist_netG_epoch_24.pth'
+# NETD_MNIST = './samples/mnist_netD_epoch_24.pth'
+NETG_CIFAR10 = './samples/cifar10/netG_epoch_24.pth'
+NETD_CIFAR10 = './samples/cifar10/netD_epoch_24.pth'
+NETG_MNIST = './samples/mnist/netG_epoch_24.pth'
+NETD_MNIST = './samples/mnist/netD_epoch_24.pth'
+
+
+
 NUM_EPOCHS = 2 if isDebug else 25
 LR_D = 0.00005
 LR_G = 0.00005
@@ -68,8 +79,10 @@ def main(opt):
                                    transforms.Scale(opt.imageSize),
                                    transforms.ToTensor(),
                                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                               ])
-        )
+                               ]))
+        # Load pre-trained state dict
+        opt.netD = NETD_CIFAR10
+        opt.netG = NETG_CIFAR10
     elif opt.dataset == 'mnist':
         dataset = dset.MNIST(root=opt.dataroot, download=True, transform=transforms.Compose([
                                    transforms.Scale(opt.imageSize),
@@ -78,6 +91,9 @@ def main(opt):
                                ]))
         # Update opt params for mnist
         opt.nc = 1
+        opt.imageSize = 28
+        opt.netD = NETD_MNIST
+        opt.netG = NETG_MNIST
 
     assert dataset
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=opt.batchSize,
@@ -213,31 +229,30 @@ def main(opt):
                 % (epoch, opt.niter, i, len(dataloader), gen_iterations,
                 errD.data[0], errG.data[0], errD_real.data[0], errD_fake.data[0]))
 
-            wasserstein_estimate.append(errD.data[0])
+            # wasserstein_estimate.append(errD.data[0])
 
             if gen_iterations % 500 == 0 or ((gen_iterations % 100 == 0) and (opt.dataset == 'mnist')):
                 real_cpu = real_cpu.mul(0.5).add(0.5)
-                vutils.save_image(real_cpu, '{0}/{1}_real_samples.png'.format(opt.experiment, opt.dataset))
+                vutils.save_image(real_cpu, '{0}/{1}/real_samples.png'.format(opt.experiment, opt.dataset))
                 fake = netG(Variable(fixed_noise, volatile=True))
                 fake.data = fake.data.mul(0.5).add(0.5)
-                vutils.save_image(fake.data, '{0}/{1}_fake_samples_{2}.png'.format(opt.experiment, opt.dataset, gen_iterations))
+                vutils.save_image(fake.data, '{0}/{1}/fake_samples_{2}.png'.format(opt.experiment, opt.dataset, gen_iterations))
 
         # do checkpointing
         if opt.niter > 25:
             if epoch % 10 == 0:
-                torch.save(netG.state_dict(), '{0}/{1}_netG_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
-                torch.save(netD.state_dict(), '{0}/{1}_netD_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
+                torch.save(netG.state_dict(), '{0}/{1}/netG_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
+                torch.save(netD.state_dict(), '{0}/{1}/netD_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
         else:
-            torch.save(netG.state_dict(), '{0}/{1}_netG_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
-            torch.save(netD.state_dict(), '{0}/{1}_netD_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
+            torch.save(netG.state_dict(), '{0}/{1}/netG_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
+            torch.save(netD.state_dict(), '{0}/{1}/netD_epoch_{2}.pth'.format(opt.experiment, opt.dataset, epoch))
 
         # Save Wassestein estimate
-        np.save(f"{opt.experiment}/wasserstein_estimate_{epoch}", np.array(wasserstein_estimate))
+        # np.save(f"{opt.experiment}/wasserstein_estimate_{epoch}", np.array(wasserstein_estimate))
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    # parser.add_argument('--dataset', required=True, help='cifar10 | lsun | imagenet | folder | lfw ')
     parser.add_argument('--dataset', required=False, type=str, default=DATASET, help='cifar10 | imagenet | folder | lfw ')
     parser.add_argument('--dataroot', required=True, help='path to dataset')
     parser.add_argument('--debug', default=isDebug, help='True | False')
@@ -265,7 +280,19 @@ if __name__ == "__main__":
     parser.add_argument('--n_extra_layers', type=int, default=0, help='Number of extra layers on gen and disc')
     parser.add_argument('--experiment', default=None, help='Where to store samples and models')
     parser.add_argument('--adam', action='store_true', help='Whether to use adam (default is rmsprop)')
+    parser.add_argument('--visualize', action='store_true', help='Enables Visdom')
     opt = parser.parse_args()
-    print(opt)
 
+    try:
+        from visdom import Visdom
+        import torchnet as tnt
+        from torchnet.engine import Engine
+        from torchnet.logger import VisdomPlotLogger, VisdomTextLogger, VisdomLogger
+        canVisualize = True
+    except ImportError as ie:
+        print("Could not import vizualization imports. ", file=sys.stderr)
+        canVisualize = False
+
+    opt.visualize = True if (opt.visualize and canVisualize) else False
+    print(opt)
     main(opt)
