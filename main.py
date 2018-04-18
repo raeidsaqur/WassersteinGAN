@@ -85,14 +85,13 @@ def main(opt):
             opt.netD = NETD_CIFAR10
             opt.netG = NETG_CIFAR10
     elif opt.dataset == 'mnist':
+        opt.nc = 1
+        opt.imageSize = 32
         dataset = dset.MNIST(root=opt.dataroot, download=True, transform=transforms.Compose([
                                    transforms.Scale(opt.imageSize),
-                                   transforms.ToTensor(),
-                                   transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                                   transforms.ToTensor()
                                ]))
         # Update opt params for mnist
-        opt.nc = 1
-        opt.imageSize = 28
         if opt.load_dict:
             opt.netD = NETD_MNIST
             opt.netG = NETG_MNIST
