@@ -81,8 +81,9 @@ def main(opt):
                                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                                ]))
         # Load pre-trained state dict
-        opt.netD = NETD_CIFAR10
-        opt.netG = NETG_CIFAR10
+        if opt.load_dict:
+            opt.netD = NETD_CIFAR10
+            opt.netG = NETG_CIFAR10
     elif opt.dataset == 'mnist':
         dataset = dset.MNIST(root=opt.dataroot, download=True, transform=transforms.Compose([
                                    transforms.Scale(opt.imageSize),
@@ -92,8 +93,9 @@ def main(opt):
         # Update opt params for mnist
         opt.nc = 1
         opt.imageSize = 28
-        opt.netD = NETD_MNIST
-        opt.netG = NETG_MNIST
+        if opt.load_dict:
+            opt.netD = NETD_MNIST
+            opt.netG = NETG_MNIST
 
     assert dataset
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=opt.batchSize,
@@ -269,6 +271,7 @@ if __name__ == "__main__":
     parser.add_argument('--lrG', type=float, default=LR_G, help='learning rate for Generator, default=0.00005')
     parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
     parser.add_argument('--cuda', action='store_true', help='enables cuda')
+    parser.add_argument('--load_dict', action='store_true', help='Loads saved state dicts')
     parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
     parser.add_argument('--netG', default='', help="path to netG (to continue training)")
     parser.add_argument('--netD', default='', help="path to netD (to continue training)")
