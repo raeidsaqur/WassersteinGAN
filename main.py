@@ -144,6 +144,7 @@ def main(opt):
     mone = one * -1
 
     if opt.cuda:
+        print("Using Cuda")
         netD.cuda()
         netG.cuda()
         input = input.cuda()
