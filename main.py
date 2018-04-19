@@ -85,6 +85,7 @@ def main(opt):
             opt.netD = NETD_CIFAR10
             opt.netG = NETG_CIFAR10
     elif opt.dataset == 'mnist':
+        opt.imageSize = 32
         dataset = dset.MNIST(root=opt.dataroot, download=True, transform=transforms.Compose([
                                    transforms.Scale(opt.imageSize),
                                    transforms.ToTensor(),
@@ -92,7 +93,7 @@ def main(opt):
                                ]))
         # Update opt params for mnist
         opt.nc = 1
-        opt.imageSize = 28
+        
         if opt.load_dict:
             opt.netD = NETD_MNIST
             opt.netG = NETG_MNIST
@@ -132,7 +133,10 @@ def main(opt):
     if opt.mlp_D:
         netD = mlp.MLP_D(opt.imageSize, nz, nc, ndf, ngpu)
     else:
-        netD = dcgan.DCGAN_D(opt.imageSize, nz, nc, ndf, ngpu, n_extra_layers)
+        if opt.SN:
+            netD= dcgan.SN_DCGAN_D(opt.imageSize, nz, nc, ndf, ngpu, n_extra_layers)
+        else:
+            netD = dcgan.DCGAN_D(opt.imageSize, nz, nc, ndf, ngpu, n_extra_layers)
         netD.apply(weights_init)
 
     if opt.netD != '':
@@ -200,6 +204,7 @@ def main(opt):
                 inputv = Variable(input)
 
                 errD_real = netD(inputv)
+
                 errD_real.backward(one)
 
                 # train with fake
@@ -257,7 +262,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', required=False, type=str, default=DATASET, help='cifar10 | imagenet | folder | lfw ')
-    parser.add_argument('--dataroot', required=True, help='path to dataset')
+    parser.add_argument('--dataroot', required=True,default='data/processed', help='path to dataset')
     parser.add_argument('--debug', default=isDebug, help='True | False')
     parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
     parser.add_argument('--batchSize', type=int, default=64, help='input batch size')
@@ -285,6 +290,7 @@ if __name__ == "__main__":
     parser.add_argument('--experiment', default=None, help='Where to store samples and models')
     parser.add_argument('--adam', action='store_true', help='Whether to use adam (default is rmsprop)')
     parser.add_argument('--visualize', action='store_true', help='Enables Visdom')
+    parser.add_argument('--SN', action='store_true',default=True, help='Enables Spectral Normalization ')
     opt = parser.parse_args()
 
     try:
